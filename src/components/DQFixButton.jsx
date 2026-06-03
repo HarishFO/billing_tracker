@@ -7,6 +7,23 @@ function clickupUrl(path) {
   return `${base}${path}`
 }
 
+const SPACE_ID = '90165413223'
+
+async function addFieldOption(fieldId, name, apiToken) {
+  const res = await fetch(clickupUrl(`/api/v2/space/${SPACE_ID}/field/${fieldId}/option`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: apiToken },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.err || `HTTP ${res.status}`)
+  }
+  const data = await res.json()
+  const options = data.type_config?.options || []
+  return options.find(o => o.name.toLowerCase() === name.toLowerCase()) || null
+}
+
 async function writeField(taskId, fieldId, value, apiToken, isUser) {
   // User fields need integer ID; dropdown fields need string option ID
   const payload = isUser ? { value: parseInt(value, 10) } : { value }
@@ -134,23 +151,6 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
   )
 }
 
-// Add a new option to a ClickUp dropdown field
-async function addFieldOption(fieldId, name, apiToken) {
-  const res = await fetch(clickupUrl(`/api/v2/field/${fieldId}/option`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: apiToken },
-    body: JSON.stringify({ name }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.err || `HTTP ${res.status}`)
-  }
-  const data = await res.json()
-  // ClickUp returns the updated field — find the new option by name
-  const options = data.type_config?.options || []
-  return options.find(o => o.name.toLowerCase() === name.toLowerCase()) || null
-}
-
 // Single field editor — searchable dropdown or text input
 function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
   const meta = DQ_FIELDS[fieldLabel]
@@ -194,7 +194,6 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
               try {
                 const opt = await addFieldOption(meta.fieldId, name, apiToken)
                 if (opt) {
-                  // Update local options list so the new option is selectable
                   options.push({ id: opt.id, name: opt.name })
                   return opt
                 }
