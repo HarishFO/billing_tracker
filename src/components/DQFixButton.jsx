@@ -22,9 +22,10 @@ async function writeField(taskId, fieldId, value, apiToken, isUser) {
 }
 
 // Searchable dropdown component
-function SearchableSelect({ options, value, onChange, placeholder = 'Search…' }) {
+function SearchableSelect({ options, value, onChange, placeholder = 'Search…', onAddOption, fieldId }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [adding, setAdding] = useState(false)
   const ref = useRef()
 
   const filtered = useMemo(() =>
@@ -32,7 +33,10 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…' 
     [options, search]
   )
 
-  const selected = options.find(o => o.id === value)
+  const exactMatch = options.some(o => o.name.toLowerCase() === search.toLowerCase())
+  const showAdd = onAddOption && search.trim().length > 1 && !exactMatch
+
+  const selected = options.find(o => String(o.id) === String(value))
 
   useEffect(() => {
     function handleClick(e) {
@@ -41,6 +45,21 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…' 
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  async function handleAdd() {
+    if (!search.trim() || adding) return
+    setAdding(true)
+    try {
+      const newOption = await onAddOption(search.trim())
+      if (newOption) {
+        onChange(String(newOption.id))
+        setSearch('')
+        setOpen(false)
+      }
+    } finally {
+      setAdding(false)
+    }
+  }
 
   return (
     <div ref={ref} style={{ position:'relative', minWidth:180, flex:1 }}>
@@ -61,7 +80,7 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…' 
         <div style={{
           position:'absolute', top:'100%', left:0, right:0, zIndex:100,
           background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8,
-          marginTop:4, boxShadow:'0 8px 24px rgba(0,0,0,0.4)', maxHeight:220, display:'flex', flexDirection:'column'
+          marginTop:4, boxShadow:'0 8px 24px rgba(0,0,0,0.4)', maxHeight:240, display:'flex', flexDirection:'column'
         }}>
           <input
             autoFocus
@@ -75,30 +94,61 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…' 
             }}
           />
           <div style={{ overflowY:'auto', flex:1 }}>
-            {filtered.length === 0
-              ? <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-dim)' }}>No results</div>
-              : filtered.map(o => (
-                <div
-                  key={o.id}
-                  onClick={() => { onChange(o.id); setOpen(false); setSearch('') }}
-                  style={{
-                    padding:'7px 12px', fontSize:12, cursor:'pointer',
-                    color: o.id === value ? 'var(--lime)' : 'var(--text)',
-                    background: o.id === value ? 'rgba(98,216,78,0.08)' : 'transparent',
-                    transition:'background 0.1s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                  onMouseLeave={e => e.currentTarget.style.background = o.id === value ? 'rgba(98,216,78,0.08)' : 'transparent'}
-                >
-                  {o.name}
-                </div>
-              ))
-            }
+            {filtered.map(o => (
+              <div
+                key={o.id}
+                onClick={() => { onChange(String(o.id)); setOpen(false); setSearch('') }}
+                style={{
+                  padding:'7px 12px', fontSize:12, cursor:'pointer',
+                  color: String(o.id) === String(value) ? 'var(--lime)' : 'var(--text)',
+                  background: String(o.id) === String(value) ? 'rgba(98,216,78,0.08)' : 'transparent',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = String(o.id) === String(value) ? 'rgba(98,216,78,0.08)' : 'transparent'}
+              >
+                {o.name}
+              </div>
+            ))}
+            {filtered.length === 0 && !showAdd && (
+              <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-dim)' }}>No results</div>
+            )}
+            {showAdd && (
+              <div
+                onClick={handleAdd}
+                style={{
+                  padding:'8px 12px', fontSize:12, cursor: adding ? 'not-allowed' : 'pointer',
+                  color:'var(--lime)', borderTop:'1px solid var(--border)',
+                  display:'flex', alignItems:'center', gap:6,
+                  background:'rgba(98,216,78,0.04)',
+                  opacity: adding ? 0.6 : 1,
+                }}
+              >
+                <span>{adding ? '⟳' : '+'}</span>
+                <span>{adding ? 'Adding…' : `Add "${search.trim()}" to ClickUp`}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   )
+}
+
+// Add a new option to a ClickUp dropdown field
+async function addFieldOption(fieldId, name, apiToken) {
+  const res = await fetch(clickupUrl(`/api/v2/field/${fieldId}/option`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: apiToken },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.err || `HTTP ${res.status}`)
+  }
+  const data = await res.json()
+  // ClickUp returns the updated field — find the new option by name
+  const options = data.type_config?.options || []
+  return options.find(o => o.name.toLowerCase() === name.toLowerCase()) || null
 }
 
 // Single field editor — searchable dropdown or text input
@@ -135,7 +185,25 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
   return (
     <div style={{ display:'flex', gap:4, alignItems:'center', flex:1 }}>
       {options
-        ? <SearchableSelect options={options} value={value} onChange={setValue} placeholder={`Search ${fieldLabel}…`} />
+        ? <SearchableSelect
+            options={options}
+            value={value}
+            onChange={setValue}
+            placeholder={`Search ${fieldLabel}…`}
+            onAddOption={!meta.isUser ? async (name) => {
+              try {
+                const opt = await addFieldOption(meta.fieldId, name, apiToken)
+                if (opt) {
+                  // Update local options list so the new option is selectable
+                  options.push({ id: opt.id, name: opt.name })
+                  return opt
+                }
+              } catch (e) {
+                alert(`Failed to add option: ${e.message}`)
+              }
+              return null
+            } : undefined}
+          />
         : <input type="text" className="field-input"
             style={{ fontSize:11, padding:'4px 8px', flex:1 }}
             placeholder={fieldLabel} value={value}

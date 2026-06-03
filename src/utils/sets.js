@@ -123,10 +123,20 @@ export function dataQualityIssues(tasks) {
     { key: 'designer',     label: 'Primary Designer' },
   ]
 
+  // Deliverables that don't require a designer
+  const DEV_ONLY = ['development']
+
   return tasks
     .map(r => {
+      const isDevOnly = r.deliverables &&
+        DEV_ONLY.some(d => r.deliverables.toLowerCase().trim() === d)
+
       const missing = REQUIRED
-        .filter(f => !r[f.key] || r[f.key].trim() === '')
+        .filter(f => {
+          // Skip Primary Designer check for dev-only tasks
+          if (f.key === 'designer' && isDevOnly) return false
+          return !r[f.key] || r[f.key].trim() === ''
+        })
         .map(f => f.label)
       return missing.length > 0 ? { ...r, missingFields: missing } : null
     })
