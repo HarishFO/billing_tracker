@@ -121,20 +121,28 @@ export function dataQualityIssues(tasks) {
     { key: 'reqMonth',     label: 'Req Received Month' },
     { key: 'deliverables', label: 'Deliverables EM' },
     { key: 'designer',     label: 'Primary Designer' },
+    { key: 'developer',    label: 'Primary Developer' },
   ]
-
-  // Deliverables that don't require a designer
-  const DEV_ONLY = ['development']
 
   return tasks
     .map(r => {
-      const isDevOnly = r.deliverables &&
-        DEV_ONLY.some(d => r.deliverables.toLowerCase().trim() === d)
+      const deliv = (r.deliverables || '').toLowerCase().trim()
+      const hasDesign = deliv.includes('design')
+      const hasDev    = deliv.includes('dev')
+      const delivSet  = deliv.length > 0 // deliverable field is filled
 
       const missing = REQUIRED
         .filter(f => {
-          // Skip Primary Designer check for dev-only tasks
-          if (f.key === 'designer' && isDevOnly) return false
+          // Only flag designer if deliverable includes Design
+          if (f.key === 'designer') {
+            if (!delivSet) return false // can't judge without knowing deliverable
+            return hasDesign && (!r[f.key] || r[f.key].trim() === '')
+          }
+          // Only flag developer if deliverable includes Dev
+          if (f.key === 'developer') {
+            if (!delivSet) return false
+            return hasDev && (!r[f.key] || r[f.key].trim() === '')
+          }
           return !r[f.key] || r[f.key].trim() === ''
         })
         .map(f => f.label)
