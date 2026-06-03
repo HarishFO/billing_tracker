@@ -238,6 +238,9 @@ export default function ReconciliationScreen({
                         <span key={m} className="missing-tag">{m}</span>
                       ))}
                     </td>
+                    <td>
+                      <DQFixRow task={r} apiToken={apiToken} clientList={clientList} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
