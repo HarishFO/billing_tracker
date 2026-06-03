@@ -137,3 +137,32 @@ export const DQ_FIELDS = {
     optionsKey: 'client', // comes from live clientList passed in
   },
 }
+
+// Default deliverable per transitioned client
+// Used to auto-suggest deliverable when bulk fixing
+export const CLIENT_DELIVERABLE_MAP = {
+  'Centric Squared':          'Design + Development',
+  'Mailjestic':               'Design',
+  'Omni Agency':              'Design',
+  'Bucklandco':               'Copy + Design',
+  'EmailGab':                 'Design + Development',
+  'Bee':                      'Development',
+  'Source Marketing':         'Design + Development',
+  'Onlygrowth':               'Design + Development',
+  'Pop Marketing':            'Development',
+  'Ecommerce Emails':         'Design + Development',
+  'Its Just Ecommerce':       'Design + Development',
+  "It's Just Ecommerce":      'Design + Development',
+  'Three Beacon Marketing':   'Design + Development',
+  'Online Shop Performance':  'Copy + Design + Development',
+  '108 Agency':               'Copy + Design + Development',
+  'Invisible Brands':         'Design + Development',
+  'Hairfinity & Gofinity':    'Design + Development',
+  'Matthew (Email Ops)':      'Design + Development',
+  'TCMA':                     'Design + Development',
+  'Hillel Berg':              'Design + Development',
+  'Adwired':                  'Design',
+  'Sarkis':                   'Copy + Design + Development',
+  'Lifesync':                 'Design + Development',
+  'Digitally In Touch':       'Copy + Design + Development',
+}

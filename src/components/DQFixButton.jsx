@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { FIELD_OPTIONS, DQ_FIELDS } from '../utils/fieldOptions'
+import { FIELD_OPTIONS, DQ_FIELDS, CLIENT_DELIVERABLE_MAP } from '../utils/fieldOptions'
 
 function clickupUrl(path) {
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -211,6 +211,17 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
   const meta = field ? DQ_FIELDS[field] : null
   const options = meta?.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null
 
+  // Auto-suggest deliverable when all selected tasks share the same client
+  useEffect(() => {
+    if (field !== 'Deliverables EM' || !options) return
+    const clients = [...new Set(selectedTasks.map(t => t.client).filter(Boolean))]
+    if (clients.length !== 1) return
+    const suggested = CLIENT_DELIVERABLE_MAP[clients[0]]
+    if (!suggested) return
+    const match = options.find(o => o.name.trim().includes(suggested.trim()) || suggested.includes(o.name.trim()))
+    if (match && !value) setValue(match.id)
+  }, [field, selectedTasks])
+
   async function applyAll() {
     if (!field || !value || !meta) return
     const applicable = selectedTasks.filter(t => t.missingFields.includes(field))
@@ -239,9 +250,12 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
 
   return (
     <div style={{
-      background:'rgba(98,216,78,0.06)', border:'1px solid rgba(98,216,78,0.2)',
+      background:'rgba(11,12,14,0.96)', border:'1px solid rgba(98,216,78,0.25)',
       borderRadius:12, padding:'14px 18px', marginBottom:12, display:'flex',
-      flexWrap:'wrap', gap:12, alignItems:'center'
+      flexWrap:'wrap', gap:12, alignItems:'center',
+      position:'sticky', top:0, zIndex:50,
+      backdropFilter:'blur(10px)',
+      boxShadow:'0 4px 24px rgba(0,0,0,0.4)',
     }}>
       <div style={{ fontSize:12, fontWeight:700, color:'var(--lime)', flexShrink:0 }}>
         {selectedTasks.length} tasks selected
