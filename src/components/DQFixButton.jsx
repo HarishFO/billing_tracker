@@ -7,25 +7,7 @@ function clickupUrl(path) {
   return `${base}${path}`
 }
 
-const SPACE_ID = '90165413223'
-
-async function addFieldOption(fieldId, name, apiToken) {
-  const res = await fetch(clickupUrl(`/api/v2/space/${SPACE_ID}/field/${fieldId}/option`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: apiToken },
-    body: JSON.stringify({ name }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.err || `HTTP ${res.status}`)
-  }
-  const data = await res.json()
-  const options = data.type_config?.options || []
-  return options.find(o => o.name.toLowerCase() === name.toLowerCase()) || null
-}
-
 async function writeField(taskId, fieldId, value, apiToken, isUser) {
-  // User fields need integer ID; dropdown fields need string option ID
   const payload = isUser ? { value: parseInt(value, 10) } : { value }
   const res = await fetch(clickupUrl(`/api/v2/task/${taskId}/field/${fieldId}`), {
     method: 'POST',
@@ -38,20 +20,16 @@ async function writeField(taskId, fieldId, value, apiToken, isUser) {
   }
 }
 
-// Searchable dropdown component
-function SearchableSelect({ options, value, onChange, placeholder = 'Search…', onAddOption, fieldId }) {
+// Searchable dropdown — no add-option (ClickUp API doesn't support it)
+function SearchableSelect({ options, value, onChange, placeholder = 'Search…' }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [adding, setAdding] = useState(false)
   const ref = useRef()
 
   const filtered = useMemo(() =>
     options.filter(o => o.name.toLowerCase().includes(search.toLowerCase())),
     [options, search]
   )
-
-  const exactMatch = options.some(o => o.name.toLowerCase() === search.toLowerCase())
-  const showAdd = onAddOption && search.trim().length > 1 && !exactMatch
 
   const selected = options.find(o => String(o.id) === String(value))
 
@@ -63,21 +41,6 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  async function handleAdd() {
-    if (!search.trim() || adding) return
-    setAdding(true)
-    try {
-      const newOption = await onAddOption(search.trim())
-      if (newOption) {
-        onChange(String(newOption.id))
-        setSearch('')
-        setOpen(false)
-      }
-    } finally {
-      setAdding(false)
-    }
-  }
-
   return (
     <div ref={ref} style={{ position:'relative', minWidth:180, flex:1 }}>
       <div
@@ -85,7 +48,8 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
         style={{
           background:'var(--bg-card2)', border:'1px solid var(--border)', borderRadius:8,
           padding:'4px 10px', fontSize:12, cursor:'pointer', display:'flex',
-          justifyContent:'space-between', alignItems:'center', color: selected ? 'var(--text)' : 'var(--text-dim)'
+          justifyContent:'space-between', alignItems:'center',
+          color: selected ? 'var(--text)' : 'var(--text-dim)'
         }}
       >
         <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -111,6 +75,9 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
             }}
           />
           <div style={{ overflowY:'auto', flex:1 }}>
+            {filtered.length === 0 && (
+              <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-dim)' }}>No results</div>
+            )}
             {filtered.map(o => (
               <div
                 key={o.id}
@@ -126,24 +93,6 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
                 {o.name}
               </div>
             ))}
-            {filtered.length === 0 && !showAdd && (
-              <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text-dim)' }}>No results</div>
-            )}
-            {showAdd && (
-              <div
-                onClick={handleAdd}
-                style={{
-                  padding:'8px 12px', fontSize:12, cursor: adding ? 'not-allowed' : 'pointer',
-                  color:'var(--lime)', borderTop:'1px solid var(--border)',
-                  display:'flex', alignItems:'center', gap:6,
-                  background:'rgba(98,216,78,0.04)',
-                  opacity: adding ? 0.6 : 1,
-                }}
-              >
-                <span>{adding ? '⟳' : '+'}</span>
-                <span>{adding ? 'Adding…' : `Add "${search.trim()}" to ClickUp`}</span>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -151,8 +100,8 @@ function SearchableSelect({ options, value, onChange, placeholder = 'Search…',
   )
 }
 
-// Single field editor — searchable dropdown or text input
-function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
+// Single field editor
+function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, fieldOptions }) {
   const meta = DQ_FIELDS[fieldLabel]
   const [value, setValue] = useState('')
   const [state, setState] = useState('idle')
@@ -162,16 +111,20 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
     return <span className="muted small" style={{ fontSize:11 }}>Fix in ClickUp</span>
   }
 
-  const options = meta.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null
+  const liveOptions = fieldOptions && meta.optionsKey ? fieldOptions[meta.optionsKey] : null
+  const options = (liveOptions && liveOptions.length > 0) ? liveOptions : (meta.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null)
 
   async function save() {
     if (!value) return
     setState('saving')
     try {
-      await writeField(taskId, meta.fieldId, value, apiToken, meta.isUser)
+      const displayName = options
+        ? (options.find(o => String(o.id) === String(value))?.name || value)
+        : value
+      if (!meta.localOnly) {
+        await writeField(taskId, meta.fieldId, value, apiToken, meta.isUser)
+      }
       setState('done')
-      // Pass display name (not option ID) so tracker can use it directly
-      const displayName = options ? (options.find(o => String(o.id) === String(value))?.name || value) : value
       onFixed && onFixed(fieldLabel, displayName)
     } catch (e) {
       setState('error')
@@ -185,24 +138,7 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
   return (
     <div style={{ display:'flex', gap:4, alignItems:'center', flex:1 }}>
       {options
-        ? <SearchableSelect
-            options={options}
-            value={value}
-            onChange={setValue}
-            placeholder={`Search ${fieldLabel}…`}
-            onAddOption={!meta.isUser ? async (name) => {
-              try {
-                const opt = await addFieldOption(meta.fieldId, name, apiToken)
-                if (opt) {
-                  options.push({ id: opt.id, name: opt.name })
-                  return opt
-                }
-              } catch (e) {
-                alert(`Failed to add option: ${e.message}`)
-              }
-              return null
-            } : undefined}
-          />
+        ? <SearchableSelect options={options} value={value} onChange={setValue} placeholder={`Search ${fieldLabel}…`} />
         : <input type="text" className="field-input"
             style={{ fontSize:11, padding:'4px 8px', flex:1 }}
             placeholder={fieldLabel} value={value}
@@ -211,22 +147,22 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
       <button
         className={`fix-btn ${state === 'saving' ? 'fixing' : ''}`}
         style={{ flexShrink:0 }}
+        title={meta.localOnly ? 'Updates export only — not saved to ClickUp' : 'Updates ClickUp and export'}
         onClick={save}
-        disabled={!value || state === 'saving' || disabled}
+        disabled={!value || state === 'saving'}
       >
-        {state === 'saving' ? '⟳' : '⚡'}
+        {state === 'saving' ? '⟳' : meta.localOnly ? '📋' : '⚡'}
       </button>
     </div>
   )
 }
 
 // Per-row fix UI
-export function DQFixRow({ task, apiToken, onFixed: onParentFixed }) {
+export function DQFixRow({ task, apiToken, onFixed: onParentFixed, fieldOptions }) {
   const [fixed, setFixed] = useState(new Set())
 
   function onFixed(fieldLabel, displayName) {
     setFixed(prev => new Set([...prev, fieldLabel]))
-    // Bubble up with taskId so App.jsx can track it
     if (onParentFixed) onParentFixed(task.taskId, fieldLabel, displayName)
   }
 
@@ -241,7 +177,7 @@ export function DQFixRow({ task, apiToken, onFixed: onParentFixed }) {
           <span style={{ fontSize:10, color:'var(--text-muted)', width:130, flexShrink:0 }}>{f}</span>
           {fixed.has(f)
             ? <span className="fix-btn fixed" style={{ fontSize:10 }}>✓</span>
-            : <FieldEditor fieldLabel={f} taskId={task.taskId} apiToken={apiToken} onFixed={onFixed} />
+            : <FieldEditor fieldLabel={f} taskId={task.taskId} apiToken={apiToken} onFixed={onFixed} fieldOptions={fieldOptions} />
           }
         </div>
       ))}
@@ -249,14 +185,13 @@ export function DQFixRow({ task, apiToken, onFixed: onParentFixed }) {
   )
 }
 
-// Bulk fix panel — shown above the table when tasks are selected
-export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDone }) {
+// Bulk fix panel
+export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDone, fieldOptions }) {
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
-  const [state, setState] = useState('idle') // idle | running | done
+  const [state, setState] = useState('idle')
   const [progress, setProgress] = useState({ done: 0, total: 0 })
 
-  // Find fields that are missing across all selected tasks
   const missingAcrossAll = useMemo(() => {
     const counts = {}
     for (const t of selectedTasks) {
@@ -269,16 +204,17 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
       .map(([f, count]) => ({ field: f, count }))
   }, [selectedTasks])
 
-  // Reset state when selection changes so stale "Fixed N" doesn't persist
+  // Reset when selection changes
   useEffect(() => {
     setState('idle')
     setProgress({ done: 0, total: 0 })
   }, [selectedTasks.map(t => t.taskId).join(',')])
 
   const meta = field ? DQ_FIELDS[field] : null
-  const options = meta?.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null
+  const liveOptions = fieldOptions && meta?.optionsKey ? fieldOptions[meta.optionsKey] : null
+  const options = (liveOptions && liveOptions.length > 0) ? liveOptions : (meta?.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null)
 
-  // Auto-suggest deliverable when all selected tasks share the same client
+  // Auto-suggest deliverable for single-client selection
   useEffect(() => {
     if (field !== 'Deliverables EM' || !options) return
     const clients = [...new Set(selectedTasks.map(t => t.client).filter(Boolean))]
@@ -297,14 +233,17 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
 
     for (let i = 0; i < applicable.length; i++) {
       try {
-        await writeField(applicable[i].taskId, meta.fieldId, value, apiToken, meta.isUser)
+        if (!meta.localOnly) {
+          await writeField(applicable[i].taskId, meta.fieldId, value, apiToken, meta.isUser)
+        }
       } catch (_) {}
       setProgress({ done: i + 1, total: applicable.length })
     }
 
     setState('done')
-    const displayName = options ? (options.find(o => String(o.id) === String(value))?.name || value) : value
-    // Pass each taskId individually so App.jsx can track every fix
+    const displayName = options
+      ? (options.find(o => String(o.id) === String(value))?.name || value)
+      : value
     if (onBulkFixed) {
       for (const t of applicable) {
         onBulkFixed(t.taskId, field, displayName)
@@ -328,7 +267,6 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
         {selectedTasks.length} tasks selected
       </div>
 
-      {/* Field picker */}
       <select
         className="field-input"
         style={{ fontSize:12, padding:'5px 10px', minWidth:180 }}
@@ -341,7 +279,6 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
         ))}
       </select>
 
-      {/* Value picker — searchable */}
       {meta && (
         options
           ? <SearchableSelect options={options} value={value} onChange={setValue} placeholder={`Search ${field}…`} />
@@ -351,7 +288,6 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
               value={value} onChange={e => setValue(e.target.value)} />
       )}
 
-      {/* Apply button */}
       {field && value && (
         <button
           className={`btn-secondary ${state === 'running' ? 'btn-disabled' : ''}`}
