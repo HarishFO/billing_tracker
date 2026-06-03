@@ -103,7 +103,7 @@ function FixButton({ taskId, missing, billingMonth, apiToken, onFixed }) {
 }
 
 export default function ReconciliationScreen({
-  rows, sets, clientList, billingMonth, setBillingMonth, onProceed, onReupload, apiToken
+  rows, sets, clientList, billingMonth, setBillingMonth, onProceed, onReupload, apiToken, onApplyFix
 }) {
   const [override, setOverride]       = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
@@ -215,7 +215,7 @@ export default function ReconciliationScreen({
           <BulkFixPanel
             selectedTasks={dqIssues.filter(r => selectedDQ.has(r.taskId))}
             apiToken={apiToken}
-            onBulkFixed={() => setSelectedDQ(new Set())}
+            onBulkFixed={(field, displayName) => { onApplyFix && onApplyFix(field, displayName); setSelectedDQ(new Set()) }}
           />
 
           <div className="table-wrap">
@@ -258,7 +258,7 @@ export default function ReconciliationScreen({
                     </td>
                     <td>{r.client || <span className="na">—</span>}</td>
                     <td>{r.missingFields.map(m => <span key={m} className="missing-tag">{m}</span>)}</td>
-                    <td><DQFixRow task={r} apiToken={apiToken} /></td>
+                    <td><DQFixRow task={r} apiToken={apiToken} onFixed={onApplyFix} /></td>
                   </tr>
                 ))}
               </tbody>

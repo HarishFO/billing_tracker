@@ -20,6 +20,7 @@ export default function App() {
   const [rows, setRows]               = useState([])
   const [billingMonth, setBillingMonth] = useState(detectBillingMonth)
   const [sets, setSets]               = useState({ D:[], A:[], B:[], C:[] })
+  const [fixes, setFixes]             = useState({}) // { [taskId]: { brand, deliverables, designer, ... } }
 
   useEffect(() => {
     const token = apiToken.trim()
@@ -36,8 +37,34 @@ export default function App() {
 
   useEffect(() => {
     if (rows.length === 0 || clientList.length === 0) { setSets({ D:[], A:[], B:[], C:[] }); return }
-    setSets(computeSets(rows, clientList, billingMonth))
-  }, [rows, clientList, billingMonth])
+    // Merge any in-session fixes into rows before computing sets
+    const mergedRows = rows.map(r =>
+      fixes[r.taskId] ? { ...r, ...fixes[r.taskId] } : r
+    )
+    setSets(computeSets(mergedRows, clientList, billingMonth))
+  }, [rows, clientList, billingMonth, fixes])
+
+  const LABEL_TO_KEY = {
+    'Brand email (transitioned)': 'brand',
+    'Deliverables EM': 'deliverables',
+    'Primary Designer': 'designer',
+    'Client (transitioned)': 'client',
+  }
+
+  function applyFix(fieldLabel, displayName) {
+    // Called when a fix is applied — but we don't know taskId here
+    // onFixed from DQFixRow passes (fieldLabel, displayName) but not taskId
+    // We need to update this — see ReconciliationScreen for the full call
+  }
+
+  function applyFixForTask(taskId, fieldLabel, displayName) {
+    const key = LABEL_TO_KEY[fieldLabel]
+    if (!key) return
+    setFixes(prev => ({
+      ...prev,
+      [taskId]: { ...(prev[taskId] || {}), [key]: displayName }
+    }))
+  }
 
   function onCSVLoaded(text) {
     try {
@@ -77,12 +104,13 @@ export default function App() {
           billingMonth={billingMonth}
           setBillingMonth={setBillingMonth}
           apiToken={apiToken}
+          onApplyFix={applyFixForTask}
           onProceed={() => setScreen('tracker')}
-          onReupload={() => { setRows([]); setSets({ D:[], A:[], B:[], C:[] }); setScreen('upload') }}
+          onReupload={() => { setRows([]); setSets({ D:[], A:[], B:[], C:[] }); setFixes({}); setScreen('upload') }}
         />
       )}
       {screen === 'tracker' && (
-        <TrackerScreen sets={sets} billingMonth={billingMonth} clientList={clientList} onBack={() => setScreen('recon')} />
+        <TrackerScreen sets={sets} billingMonth={billingMonth} clientList={clientList} fixes={fixes} onBack={() => setScreen('recon')} />
       )}
     </div>
   )

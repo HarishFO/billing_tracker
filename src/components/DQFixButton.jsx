@@ -118,7 +118,9 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
     try {
       await writeField(taskId, meta.fieldId, value, apiToken)
       setState('done')
-      onFixed && onFixed(fieldLabel, value)
+      // Pass display name (not option ID) so tracker can use it directly
+      const displayName = options ? (options.find(o => o.id === value)?.name || value) : value
+      onFixed && onFixed(fieldLabel, displayName)
     } catch (e) {
       setState('error')
       setErrMsg(e.message)
@@ -150,11 +152,13 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
 }
 
 // Per-row fix UI
-export function DQFixRow({ task, apiToken }) {
+export function DQFixRow({ task, apiToken, onFixed: onParentFixed }) {
   const [fixed, setFixed] = useState(new Set())
 
-  function onFixed(fieldLabel) {
+  function onFixed(fieldLabel, displayName) {
     setFixed(prev => new Set([...prev, fieldLabel]))
+    // Bubble up with taskId so App.jsx can track it
+    if (onParentFixed) onParentFixed(task.taskId, fieldLabel, displayName)
   }
 
   if (task.missingFields.every(f => fixed.has(f))) {
@@ -213,7 +217,8 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed }) {
     }
 
     setState('done')
-    onBulkFixed && onBulkFixed(field)
+    const displayName = options ? (options.find(o => o.id === value)?.name || value) : value
+    onBulkFixed && onBulkFixed(field, displayName)
   }
 
   if (selectedTasks.length === 0) return null
