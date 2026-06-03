@@ -215,7 +215,8 @@ export default function ReconciliationScreen({
           <BulkFixPanel
             selectedTasks={dqIssues.filter(r => selectedDQ.has(r.taskId))}
             apiToken={apiToken}
-            onBulkFixed={(field, displayName) => { onApplyFix && onApplyFix(field, displayName); setSelectedDQ(new Set()) }}
+            onBulkFixed={(taskId, field, displayName) => { onApplyFix && onApplyFix(taskId, field, displayName) }}
+            onAllBulkDone={() => setSelectedDQ(new Set())}
           />
 
           <div className="table-wrap">

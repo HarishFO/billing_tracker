@@ -181,7 +181,7 @@ export function DQFixRow({ task, apiToken, onFixed: onParentFixed }) {
 }
 
 // Bulk fix panel — shown above the table when tasks are selected
-export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed }) {
+export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDone }) {
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
   const [state, setState] = useState('idle') // idle | running | done
@@ -218,7 +218,13 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed }) {
 
     setState('done')
     const displayName = options ? (options.find(o => o.id === value)?.name || value) : value
-    onBulkFixed && onBulkFixed(field, displayName)
+    // Pass each taskId individually so App.jsx can track every fix
+    if (onBulkFixed) {
+      for (const t of applicable) {
+        onBulkFixed(t.taskId, field, displayName)
+      }
+    }
+    onAllBulkDone && onAllBulkDone()
   }
 
   if (selectedTasks.length === 0) return null
