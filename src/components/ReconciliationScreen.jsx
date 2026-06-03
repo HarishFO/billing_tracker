@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import DQFixRow from './DQFixButton'
 import { computeGaps, reconciliationStatus, orphanedSourceTasks, unknownClientTasks, dataQualityIssues } from '../utils/sets'
 import { BILLING_MONTHS } from '../constants'
 
@@ -218,6 +219,7 @@ export default function ReconciliationScreen({
                   <th>Status</th>
                   <th>List</th>
                   <th>Missing Fields</th>
+                  <th>Fix</th>
                 </tr>
               </thead>
               <tbody>
