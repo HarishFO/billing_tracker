@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import DQFixRow from './DQFixButton'
+import { DQFixRow, BulkFixPanel } from './DQFixButton'
 import { computeGaps, reconciliationStatus, orphanedSourceTasks, unknownClientTasks, dataQualityIssues } from '../utils/sets'
 import { BILLING_MONTHS } from '../constants'
 
@@ -109,6 +109,7 @@ export default function ReconciliationScreen({
   const [overrideReason, setOverrideReason] = useState('')
   const [fixedIds, setFixedIds]       = useState(new Set())
   const [fixingAll, setFixingAll]     = useState(false)
+  const [selectedDQ, setSelectedDQ]   = useState(new Set())
   const [fixAllProgress, setFixAllProgress] = useState({ done: 0, total: 0 })
 
   const { counts, allEqual } = useMemo(() => reconciliationStatus(sets), [sets])
@@ -208,39 +209,56 @@ export default function ReconciliationScreen({
             <span className="section-count">{dqIssues.length} tasks</span>
           </div>
           <p className="section-note">
-            These tasks are in Set A but are missing required fields. Update in ClickUp before exporting the tracker.
+            These tasks are in Set A but are missing required fields. Select tasks and use bulk fix, or fix individually per row.
           </p>
+
+          <BulkFixPanel
+            selectedTasks={dqIssues.filter(r => selectedDQ.has(r.taskId))}
+            apiToken={apiToken}
+            onBulkFixed={() => setSelectedDQ(new Set())}
+          />
+
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th style={{width:32}}>
+                    <input type="checkbox"
+                      style={{accentColor:'var(--lime)'}}
+                      checked={selectedDQ.size === dqIssues.length && dqIssues.length > 0}
+                      onChange={e => setSelectedDQ(e.target.checked ? new Set(dqIssues.map(r => r.taskId)) : new Set())}
+                    />
+                  </th>
                   <th>Task Name</th>
                   <th>Client</th>
-                  <th>Status</th>
-                  <th>List</th>
                   <th>Missing Fields</th>
-                  <th>Fix</th>
+                  <th>Fix Individually</th>
                 </tr>
               </thead>
               <tbody>
                 {dqIssues.map(r => (
-                  <tr key={r.taskId}>
+                  <tr key={r.taskId} style={selectedDQ.has(r.taskId) ? {background:'rgba(98,216,78,0.04)'} : {}}>
+                    <td>
+                      <input type="checkbox"
+                        style={{accentColor:'var(--lime)'}}
+                        checked={selectedDQ.has(r.taskId)}
+                        onChange={e => {
+                          setSelectedDQ(prev => {
+                            const next = new Set(prev)
+                            e.target.checked ? next.add(r.taskId) : next.delete(r.taskId)
+                            return next
+                          })
+                        }}
+                      />
+                    </td>
                     <td>
                       <a href={`https://app.clickup.com/t/${r.taskId}`} target="_blank" rel="noreferrer" className="task-link">
                         {r.taskName}
                       </a>
                     </td>
                     <td>{r.client || <span className="na">—</span>}</td>
-                    <td><span className="status-badge">{r.status}</span></td>
-                    <td className="muted">{r.list}</td>
-                    <td>
-                      {r.missingFields.map(m => (
-                        <span key={m} className="missing-tag">{m}</span>
-                      ))}
-                    </td>
-                    <td>
-                      <DQFixRow task={r} apiToken={apiToken} clientList={clientList} />
-                    </td>
+                    <td>{r.missingFields.map(m => <span key={m} className="missing-tag">{m}</span>)}</td>
+                    <td><DQFixRow task={r} apiToken={apiToken} /></td>
                   </tr>
                 ))}
               </tbody>
