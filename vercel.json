@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/clickup/:path*",
+      "destination": "https://api.clickup.com/:path*"
+    }
+  ]
+}

@@ -1,29 +1,27 @@
-import { EM_SPACE_ID, FIELD_IDS } from '../constants'
+const FIELD_ID_CLIENTS = 'cc80f6eb-dd7c-4f42-b240-175ab0d07e13'
+const SPACE_ID = '90165413223'
 
-const BASE = 'https://api.clickup.com/api/v2'
-
-async function cuFetch(path, token) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { Authorization: token, 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`ClickUp API ${res.status}: ${text}`)
-  }
-  return res.json()
+// Use proxy path on deployed environments, direct URL on localhost
+function clickupUrl(path) {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const base = isLocal ? 'https://api.clickup.com' : '/api/clickup'
+  return `${base}${path}`
 }
 
-// Validate token and return user info
-export async function validateToken(token) {
-  const data = await cuFetch('/user', token)
-  return { valid: true, user: data.user }
-}
-
-// Fetch all options from the Clients (transitioned) dropdown
-// Returns string[] of exact client names — this is the master list
 export async function fetchTransitionedClients(token) {
-  const data = await cuFetch(`/space/${EM_SPACE_ID}/field`, token)
-  const field = data.fields?.find(f => f.id === FIELD_IDS.clientTransitioned)
-  if (!field) throw new Error('Clients (transitioned) field not found in EM space')
-  return field.type_config.options.map(o => o.name)
+  const url = clickupUrl(`/api/v2/space/${SPACE_ID}/field`)
+  const res = await fetch(url, {
+    headers: { Authorization: token }
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.err || `ClickUp API error: ${res.status}`)
+  }
+
+  const data = await res.json()
+  const field = data.fields?.find(f => f.id === FIELD_ID_CLIENTS)
+  if (!field) throw new Error('Clients (transitioned) field not found in space')
+
+  return field.type_config?.options?.map(o => o.name) || []
 }
