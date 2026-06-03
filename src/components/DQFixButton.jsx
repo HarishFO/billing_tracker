@@ -7,11 +7,13 @@ function clickupUrl(path) {
   return `${base}${path}`
 }
 
-async function writeField(taskId, fieldId, value, apiToken) {
+async function writeField(taskId, fieldId, value, apiToken, isUser) {
+  // User fields need integer ID; dropdown fields need string option ID
+  const payload = isUser ? { value: parseInt(value, 10) } : { value }
   const res = await fetch(clickupUrl(`/api/v2/task/${taskId}/field/${fieldId}`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: apiToken },
-    body: JSON.stringify({ value }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -116,10 +118,10 @@ function FieldEditor({ fieldLabel, taskId, apiToken, onFixed, disabled }) {
     if (!value) return
     setState('saving')
     try {
-      await writeField(taskId, meta.fieldId, value, apiToken)
+      await writeField(taskId, meta.fieldId, value, apiToken, meta.isUser)
       setState('done')
       // Pass display name (not option ID) so tracker can use it directly
-      const displayName = options ? (options.find(o => o.id === value)?.name || value) : value
+      const displayName = options ? (options.find(o => String(o.id) === String(value))?.name || value) : value
       onFixed && onFixed(fieldLabel, displayName)
     } catch (e) {
       setState('error')
@@ -200,6 +202,12 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
       .map(([f, count]) => ({ field: f, count }))
   }, [selectedTasks])
 
+  // Reset state when selection changes so stale "Fixed N" doesn't persist
+  useEffect(() => {
+    setState('idle')
+    setProgress({ done: 0, total: 0 })
+  }, [selectedTasks.map(t => t.taskId).join(',')])
+
   const meta = field ? DQ_FIELDS[field] : null
   const options = meta?.optionsKey ? FIELD_OPTIONS[meta.optionsKey] : null
 
@@ -211,13 +219,13 @@ export function BulkFixPanel({ selectedTasks, apiToken, onBulkFixed, onAllBulkDo
 
     for (let i = 0; i < applicable.length; i++) {
       try {
-        await writeField(applicable[i].taskId, meta.fieldId, value, apiToken)
+        await writeField(applicable[i].taskId, meta.fieldId, value, apiToken, meta.isUser)
       } catch (_) {}
       setProgress({ done: i + 1, total: applicable.length })
     }
 
     setState('done')
-    const displayName = options ? (options.find(o => o.id === value)?.name || value) : value
+    const displayName = options ? (options.find(o => String(o.id) === String(value))?.name || value) : value
     // Pass each taskId individually so App.jsx can track every fix
     if (onBulkFixed) {
       for (const t of applicable) {

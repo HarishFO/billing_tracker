@@ -83,6 +83,23 @@ export const FIELD_OPTIONS = {
     {id:"e77704b9-bfe7-4efc-804d-cde3bd54c1a6",name:"Sultan's Palace"},
   ],
 
+  // Primary Designer — users field ec7f59f4
+  // These are user IDs from ClickUp workspace members
+  designers: [
+    {id:101040768, name:"Yuni Safitri"},
+    {id:100968716, name:"Ayush Maan"},
+    {id:100968711, name:"Natwar Singh Rathore"},
+    {id:101054380, name:"Raksha Hegde"},
+    {id:100988334, name:"Upasana Barua"},
+    {id:100988333, name:"Kim Longden"},
+    {id:94826096,  name:"Arpit Mehar"},
+    {id:248569929, name:"Shrestha Ghosal"},
+    {id:100800948, name:"Yashvi Sanghvi"},
+    {id:230449348, name:"Prachi Yadav"},
+    {id:100973959, name:"Devansh Singh Rathore"},
+    {id:100968727, name:"Santu Kumar"},
+    {id:100971813, name:"Vishal Kumar"},
+  ],
   // Deliverables EM — field 82d1cacd
   deliverables: [
     {id:"302a88aa-43f9-4b29-bb72-583dd251cafe",name:"Strategy + Copy + Design + Dev + Publish + Performance"},
@@ -110,7 +127,9 @@ export const DQ_FIELDS = {
   },
   'Primary Designer': {
     fieldId: 'ec7f59f4-fdba-456b-ab58-603c8ce87825',
-    type: 'text', // free text — user types name
+    type: 'dropdown',
+    optionsKey: 'designers',
+    isUser: true, // value is a user ID integer, not a string option ID
   },
   'Client (transitioned)': {
     fieldId: 'cc80f6eb-dd7c-4f42-b240-175ab0d07e13',
