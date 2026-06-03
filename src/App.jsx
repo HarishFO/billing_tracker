@@ -44,6 +44,13 @@ export default function App() {
       const parsed = parseCSV(text)
       if (parsed.length === 0) { alert('No valid tasks found in CSV.'); return }
       setRows(parsed)
+      // Auto-detect billing month from most common Billing Month value in the CSV
+      const counts = {}
+      for (const r of parsed) {
+        if (r.billingMonth) counts[r.billingMonth] = (counts[r.billingMonth] || 0) + 1
+      }
+      const detected = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+      if (detected) setBillingMonth(detected)
       setScreen('recon')
     } catch (err) {
       alert(`Failed to parse CSV: ${err.message}`)
