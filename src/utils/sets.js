@@ -111,3 +111,24 @@ export function unknownClientTasks(rows, clientList) {
     r.client && !clientSet.has(r.client.toLowerCase().trim())
   )
 }
+
+// Check Set A tasks for missing required fields
+export function dataQualityIssues(tasks) {
+  const REQUIRED = [
+    { key: 'client',       label: 'Client (transitioned)' },
+    { key: 'brand',        label: 'Brand email (transitioned)' },
+    { key: 'billingMonth', label: 'Billing Month' },
+    { key: 'reqMonth',     label: 'Req Received Month' },
+    { key: 'deliverables', label: 'Deliverables EM' },
+    { key: 'designer',     label: 'Primary Designer' },
+  ]
+
+  return tasks
+    .map(r => {
+      const missing = REQUIRED
+        .filter(f => !r[f.key] || r[f.key].trim() === '')
+        .map(f => f.label)
+      return missing.length > 0 ? { ...r, missingFields: missing } : null
+    })
+    .filter(Boolean)
+}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { computeGaps, reconciliationStatus, orphanedSourceTasks, unknownClientTasks } from '../utils/sets'
+import { computeGaps, reconciliationStatus, orphanedSourceTasks, unknownClientTasks, dataQualityIssues } from '../utils/sets'
 import { BILLING_MONTHS } from '../constants'
 
 // ClickUp field/option IDs for May 2026
@@ -114,6 +114,7 @@ export default function ReconciliationScreen({
   const gaps     = useMemo(() => computeGaps(sets, billingMonth), [sets, billingMonth])
   const orphaned = useMemo(() => orphanedSourceTasks(rows, clientList), [rows, clientList])
   const unknown  = useMemo(() => unknownClientTasks(rows, clientList), [rows, clientList])
+  const dqIssues = useMemo(() => dataQualityIssues(sets.A),              [sets.A])
 
   const unfixedGaps = gaps.filter(g => !fixedIds.has(g.taskId))
   const canProceed = (allEqual || fixedIds.size >= gaps.length || (override && overrideReason.trim().length > 0))
@@ -303,6 +304,52 @@ export default function ReconciliationScreen({
                     <td className="flag">{r.client}</td>
                     <td className="muted">{r.taskSource || '—'}</td>
                     <td className="muted">{r.list}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+
+      {/* Data quality — missing fields in Set A */}
+      {dqIssues.length > 0 && (
+        <div className="section">
+          <div className="section-title warning">
+            Set A — Incomplete Fields
+            <span className="section-count">{dqIssues.length} tasks</span>
+          </div>
+          <p className="section-note">
+            These tasks are in Set A but are missing required fields. Update in ClickUp before exporting the tracker.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Task Name</th>
+                  <th>Client</th>
+                  <th>Status</th>
+                  <th>List</th>
+                  <th>Missing Fields</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dqIssues.map(r => (
+                  <tr key={r.taskId}>
+                    <td>
+                      <a href={`https://app.clickup.com/t/${r.taskId}`} target="_blank" rel="noreferrer" className="task-link">
+                        {r.taskName}
+                      </a>
+                    </td>
+                    <td>{r.client || <span className="na">—</span>}</td>
+                    <td><span className="status-badge">{r.status}</span></td>
+                    <td className="muted">{r.list}</td>
+                    <td>
+                      {r.missingFields.map(m => (
+                        <span key={m} className="missing-tag">{m}</span>
+                      ))}
+                    </td>
                   </tr>
                 ))}
               </tbody>

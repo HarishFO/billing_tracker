@@ -82,7 +82,7 @@ export default function App() {
         />
       )}
       {screen === 'tracker' && (
-        <TrackerScreen sets={sets} billingMonth={billingMonth} onBack={() => setScreen('recon')} />
+        <TrackerScreen sets={sets} billingMonth={billingMonth} clientList={clientList} onBack={() => setScreen('recon')} />
       )}
     </div>
   )

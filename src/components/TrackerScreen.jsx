@@ -9,7 +9,7 @@ const EMPTY_MANUAL = {
   dateCreated: null, status: 'manual', list: 'Manual', _isManual: true
 }
 
-export default function TrackerScreen({ sets, billingMonth, onBack }) {
+export default function TrackerScreen({ sets, billingMonth, clientList, onBack }) {
   const [activeTab, setActiveTab] = useState('A')
   const [manualRows, setManualRows] = useState([])
   const [showAddRow, setShowAddRow] = useState(false)
@@ -59,7 +59,7 @@ export default function TrackerScreen({ sets, billingMonth, onBack }) {
   async function handleExportXLSX() {
     setExporting(true)
     try {
-      await exportXLSX(sets, manualRows, billingMonth)
+      await exportXLSX(sets, manualRows, billingMonth, clientList)
     } finally {
       setExporting(false)
     }
