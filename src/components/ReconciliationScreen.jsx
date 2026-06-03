@@ -189,13 +189,61 @@ export default function ReconciliationScreen({
         <span className="recon-banner-icon">{(allEqual || fixedIds.size >= gaps.length) ? '✓' : '⚠'}</span>
         <div>
           {allEqual
-            ? `All 4 sets match at ${counts.D} tasks — ready to generate tracker`
+            ? `All 4 sets match at ${counts.D} tasks — ready to generate tracker${dqIssues.length > 0 ? ` · ${dqIssues.length} incomplete in Set A` : ''}`
             : fixedIds.size >= gaps.length && gaps.length > 0
               ? `All ${gaps.length} gap tasks fixed in ClickUp — re-export CSV to confirm, or proceed now`
               : `Gap detected — D vs A count differs by ${Math.abs(counts.D - counts.A)}, with ${unfixedGaps.length} task(s) missing required fields. Fix below or in ClickUp, then re-export.`
           }
         </div>
       </div>
+
+
+
+      {/* Data quality — missing fields in Set A */}
+      {dqIssues.length > 0 && (
+        <div className="section">
+          <div className="section-title warning">
+            Set A — Incomplete Fields
+            <span className="section-count">{dqIssues.length} tasks</span>
+          </div>
+          <p className="section-note">
+            These tasks are in Set A but are missing required fields. Update in ClickUp before exporting the tracker.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Task Name</th>
+                  <th>Client</th>
+                  <th>Status</th>
+                  <th>List</th>
+                  <th>Missing Fields</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dqIssues.map(r => (
+                  <tr key={r.taskId}>
+                    <td>
+                      <a href={`https://app.clickup.com/t/${r.taskId}`} target="_blank" rel="noreferrer" className="task-link">
+                        {r.taskName}
+                      </a>
+                    </td>
+                    <td>{r.client || <span className="na">—</span>}</td>
+                    <td><span className="status-badge">{r.status}</span></td>
+                    <td className="muted">{r.list}</td>
+                    <td>
+                      {r.missingFields.map(m => (
+                        <span key={m} className="missing-tag">{m}</span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
 
       {/* Gap table */}
       {gaps.length > 0 && (
@@ -311,53 +359,6 @@ export default function ReconciliationScreen({
           </div>
         </div>
       )}
-
-
-      {/* Data quality — missing fields in Set A */}
-      {dqIssues.length > 0 && (
-        <div className="section">
-          <div className="section-title warning">
-            Set A — Incomplete Fields
-            <span className="section-count">{dqIssues.length} tasks</span>
-          </div>
-          <p className="section-note">
-            These tasks are in Set A but are missing required fields. Update in ClickUp before exporting the tracker.
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Task Name</th>
-                  <th>Client</th>
-                  <th>Status</th>
-                  <th>List</th>
-                  <th>Missing Fields</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dqIssues.map(r => (
-                  <tr key={r.taskId}>
-                    <td>
-                      <a href={`https://app.clickup.com/t/${r.taskId}`} target="_blank" rel="noreferrer" className="task-link">
-                        {r.taskName}
-                      </a>
-                    </td>
-                    <td>{r.client || <span className="na">—</span>}</td>
-                    <td><span className="status-badge">{r.status}</span></td>
-                    <td className="muted">{r.list}</td>
-                    <td>
-                      {r.missingFields.map(m => (
-                        <span key={m} className="missing-tag">{m}</span>
-                      ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* Override */}
       {!allEqual && fixedIds.size < gaps.length && (
         <div className="override-section">
